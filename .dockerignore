@@ -1,0 +1,16 @@
+# Fichiers exclus de l'image Docker (sécurité + taille minimale)
+.git/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+.env
+.env.*
+tests/
+data/
+*.md
+deploy.sh
+*service-account*.json

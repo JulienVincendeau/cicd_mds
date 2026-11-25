@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+
+# Secrets & clés GCP (NE JAMAIS COMMITER !)
+.env
+.env.*
+*service-account*.json
+*credentials*.json
+*.pem
+*.key
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/

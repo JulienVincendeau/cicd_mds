@@ -13,4 +13,5 @@ tests/
 data/
 *.md
 deploy.sh
+cloudbuild.yaml
 *service-account*.json

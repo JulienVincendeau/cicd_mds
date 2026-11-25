@@ -1,0 +1,70 @@
+# cloudbuild.yaml — Pipeline Cloud Build pour tester, builder et déployer sur Cloud Run
+# Déploie le service avec le trigramme "jvi" en suffixe : weather-pipeline-jvi
+#
+# Lancement manuel :
+#   gcloud builds submit --config=cloudbuild.yaml .
+# Lancement avec un autre trigramme étudiant (ex: abc) :
+#   gcloud builds submit --config=cloudbuild.yaml --substitutions=_TRIGRAM=abc .
+
+steps:
+  # 1. Qualité Shift-Left : lint (Ruff) + tests unitaires (pytest) avant de builder l'image
+  - id: Test
+    name: python:3.12-slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        pip install --quiet -e ".[dev]"
+        ruff check .
+        pytest -v --cov=src
+
+  # 2. Construction de l'image Docker (taggée avec l'identifiant unique du build)
+  - id: Build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE_PREFIX}-${_TRIGRAM}:${BUILD_ID}
+      - .
+
+  # 3. Envoi de l'image vers Artifact Registry
+  - id: Push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE_PREFIX}-${_TRIGRAM}:${BUILD_ID}
+
+  # 4. Déploiement du service Cloud Run : weather-pipeline-jvi
+  - id: Deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_PREFIX}-${_TRIGRAM}
+      - --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE_PREFIX}-${_TRIGRAM}:${BUILD_ID}
+      - --region=${_REGION}
+      - --platform=managed
+      - --no-allow-unauthenticated
+      - --max-instances=5
+      - --memory=512Mi
+      - --cpu=1
+      - --set-env-vars=GCP_PROJECT_ID=${PROJECT_ID},BQ_DATASET_TRUSTED=${_BQ_DATASET_TRUSTED},BQ_DATASET_QUARANTINE=${_BQ_DATASET_QUARANTINE}
+      - --quiet
+
+# Image produite et référencée par Cloud Build
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_AR_REPO}/${_SERVICE_PREFIX}-${_TRIGRAM}:${BUILD_ID}
+
+# Variables personnalisables (par défaut : service weather-pipeline-jvi)
+substitutions:
+  _SERVICE_PREFIX: weather-pipeline
+  _TRIGRAM: jvi
+  _REGION: europe-west1
+  _AR_REPO: dataops-repo
+  _BQ_DATASET_TRUSTED: weather_trusted__UAT
+  _BQ_DATASET_QUARANTINE: weather_quarantine__UAT
+
+options:
+  # Envoie les logs directement dans Cloud Logging (pas besoin de bucket GCS dédié)
+  logging: CLOUD_LOGGING_ONLY
